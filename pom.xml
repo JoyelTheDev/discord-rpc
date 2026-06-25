@@ -4,7 +4,7 @@
     <groupId>net.arikia.dev</groupId>
     <artifactId>discord-rpc</artifactId>
     <name>DiscordRPC</name>
-    <version>1.6.2</version>
+    <version>1.6.3-fixed</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -22,8 +22,8 @@
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
-            <version>5.4.0</version>
-            <scope>compile</scope>
+            <version>5.14.0</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.github.Vatuu</groupId>
