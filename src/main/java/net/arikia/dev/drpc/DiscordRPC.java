@@ -7,179 +7,119 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * @author Nicolas "Vatuu" Adamoglou
- * @version 1.5.1
- * <p>
- * Java Wrapper of the Discord-RPC Library for Discord Rich Presence.
- */
-
 public final class DiscordRPC {
 
-	//DLL-Version for Update Check (soon).
 	private static final String DLL_VERSION = "3.4.0";
 	private static final String LIB_VERSION = "1.6.2";
+
+	private static boolean loaded = false;
 
 	static {
 		loadDLL();
 	}
 
-	/**
-	 * Method to initialize the Discord-RPC.
-	 *
-	 * @param applicationId ApplicationID/ClientID
-	 * @param handlers      EventHandlers
-	 * @param autoRegister  AutoRegister
-	 */
 	public static void discordInitialize(String applicationId, DiscordEventHandlers handlers, boolean autoRegister) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_Initialize(applicationId, handlers, autoRegister ? 1 : 0, null);
 	}
 
-	/**
-	 * Method to register the executable of the application/game.
-	 * Only applicable when autoRegister in discordInitialize is false.
-	 *
-	 * @param applicationId ApplicationID/ClientID
-	 * @param command       Launch Command of the application/game.
-	 */
 	public static void discordRegister(String applicationId, String command) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_Register(applicationId, command);
 	}
 
-	/**
-	 * Method to initialize the Discord-RPC within a Steam Application.
-	 *
-	 * @param applicationId ApplicationID/ClientID
-	 * @param handlers      EventHandlers
-	 * @param autoRegister  AutoRegister
-	 * @param steamId       SteamAppID
-	 * @see DiscordEventHandlers
-	 */
 	public static void discordInitialize(String applicationId, DiscordEventHandlers handlers, boolean autoRegister, String steamId) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_Initialize(applicationId, handlers, autoRegister ? 1 : 0, steamId);
 	}
 
-	/**
-	 * Method to register the Steam-Executable of the application/game.
-	 * Only applicable when autoRegister in discordInitializeSteam is false.
-	 *
-	 * @param applicationId ApplicationID/ClientID
-	 * @param steamId       SteamID of the application/game.
-	 */
 	public static void discordRegisterSteam(String applicationId, String steamId) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_RegisterSteamGame(applicationId, steamId);
 	}
 
-	/**
-	 * Method to update the registered EventHandlers, after the initialization was
-	 * already called.
-	 *
-	 * @param handlers DiscordEventHandler object with updated callbacks.
-	 */
 	public static void discordUpdateEventHandlers(DiscordEventHandlers handlers) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_UpdateHandlers(handlers);
 	}
 
-	/**
-	 * Method to shutdown the Discord-RPC from within the application.
-	 */
 	public static void discordShutdown() {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_Shutdown();
 	}
 
-	/**
-	 * Method to call Callbacks from within the library.
-	 * Must be called periodically.
-	 */
 	public static void discordRunCallbacks() {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_RunCallbacks();
 	}
 
-	/**
-	 * Method to update the DiscordRichPresence of the client.
-	 *
-	 * @param presence Instance of DiscordRichPresence
-	 * @see DiscordRichPresence
-	 */
 	public static void discordUpdatePresence(DiscordRichPresence presence) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_UpdatePresence(presence);
 	}
 
-	/**
-	 * Method to clear(and therefor hide) the DiscordRichPresence until a new
-	 * presence is applied.
-	 */
 	public static void discordClearPresence() {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_ClearPresence();
 	}
 
-	/**
-	 * Method to respond to Join/Spectate Callback.
-	 *
-	 * @param userId UserID of the user to respond to.
-	 * @param reply  DiscordReply to request.
-	 * @see DiscordReply
-	 */
 	public static void discordRespond(String userId, DiscordReply reply) {
+		if (!loaded) return;
 		DLL.INSTANCE.Discord_Respond(userId, reply.reply);
 	}
 
-	//Load DLL depending on the user's architecture.
-	private static void loadDLL() {
-		String name = System.mapLibraryName("discord-rpc");
-		OSUtil osUtil = new OSUtil();
-		File homeDir;
-		String finalPath;
-		String tempPath;
-		String dir;
+	public static boolean isLoaded() {
+		return loaded;
+	}
 
-		if (osUtil.isMac()) {
-			homeDir = new File(System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support" + File.separator);
-			dir = "darwin";
-			tempPath = homeDir + File.separator + "discord-rpc" + File.separator + name;
-		} else if (osUtil.isWindows()) {
-			homeDir = new File(System.getenv("TEMP"));
-			boolean is64bit = System.getProperty("sun.arch.data.model").equals("64");
-			dir = (is64bit ? "win-x64" : "win-x86");
-			tempPath = homeDir + File.separator + "discord-rpc" + File.separator + name;
-		} else { //use createTempFile for Linux specifically, since it seems to break Windows support in *some* cases, noticed by me on my project. -Ceikry
-			finalPath = "/linux/" + name;
-			try {
-				File f = File.createTempFile("drpc", name);
-				try (InputStream in = DiscordRPC.class.getResourceAsStream(finalPath); OutputStream out = openOutputStream(f)) {
-					if(in == null) throw new FileNotFoundException("Native Linux .so library missing. Please open an issue. https://github.com/Vatuu/discord-rpc");
-					copyFile(in, out);
-					f.deleteOnExit();
-					System.load(f.getAbsolutePath());
+	private static void loadDLL() {
+		try {
+			System.setProperty("jna.nosys", "true");
+
+			String name = System.mapLibraryName("discord-rpc");
+			OSUtil osUtil = new OSUtil();
+			String dir;
+
+			if (osUtil.isMac()) {
+				dir = "darwin";
+			} else if (osUtil.isWindows()) {
+				String arch = System.getProperty("sun.arch.data.model", "64");
+				dir = arch.equals("64") ? "win-x64" : "win-x86";
+			} else {
+				String arch = System.getProperty("os.arch", "").toLowerCase();
+				if (arch.contains("aarch64") || arch.contains("arm64")) {
+					System.out.println("Discord RPC: arm64/aarch64 detected — native binary not available. Discord RPC disabled.");
+					loaded = false;
 					return;
 				}
-			} catch (IOException e){
-				e.printStackTrace();
-				System.out.println("Fatal Discord RPC exception occurred. Discord RPC will be unavailable for this session.");
+				dir = "linux";
+			}
+
+			String finalPath = "/" + dir + "/" + name;
+			InputStream in = DiscordRPC.class.getResourceAsStream(finalPath);
+
+			if (in == null) {
+				System.out.println("Discord RPC native library not found at " + finalPath + ". Discord RPC disabled.");
+				loaded = false;
 				return;
 			}
-		}
 
-		finalPath = "/" + dir + "/" + name;
+			Path tempDir = Files.createTempDirectory("drpc");
+			File f = new File(tempDir.toFile(), name);
 
-		try {
-			Path tempDirectoryPath = Files.createTempDirectory("drpc");
-			File f = new File(tempDirectoryPath + File.separator + name);
-
-			try (InputStream in = DiscordRPC.class.getResourceAsStream(finalPath); OutputStream out = openOutputStream(f)) {
-				copyFile(in, out);
-				tempDirectoryPath.toFile().deleteOnExit();
-				f.deleteOnExit();
-			} catch (IOException e) {
-				e.printStackTrace();
+			try (InputStream input = in; OutputStream out = openOutputStream(f)) {
+				copyFile(input, out);
 			}
 
+			f.deleteOnExit();
+			tempDir.toFile().deleteOnExit();
 			System.load(f.getAbsolutePath());
-		} catch(Exception e) {
-			e.printStackTrace();
-		}
+			loaded = true;
 
-		System.load(f.getAbsolutePath());
+		} catch (Throwable t) {
+			loaded = false;
+			System.out.println("Discord RPC failed to load: " + t.getMessage() + ". Discord RPC disabled.");
+		}
 	}
 
 	private static void copyFile(final InputStream input, final OutputStream output) throws IOException {
@@ -192,50 +132,20 @@ public final class DiscordRPC {
 
 	private static FileOutputStream openOutputStream(final File file) throws IOException {
 		if (file.exists()) {
-			if (file.isDirectory()) {
-				throw new IOException("File '" + file + "' exists but is a directory");
-			}
-			if (!file.canWrite()) {
-				throw new IOException("File '" + file + "' cannot be written to");
-			}
+			if (file.isDirectory()) throw new IOException("File '" + file + "' exists but is a directory");
+			if (!file.canWrite()) throw new IOException("File '" + file + "' cannot be written to");
 		} else {
 			final File parent = file.getParentFile();
-			if (parent != null) {
-				if (!parent.mkdirs() && !parent.isDirectory()) {
-					throw new IOException("Directory '" + parent + "' could not be created");
-				}
+			if (parent != null && !parent.mkdirs() && !parent.isDirectory()) {
+				throw new IOException("Directory '" + parent + "' could not be created");
 			}
 		}
 		return new FileOutputStream(file);
 	}
 
-	//------------------------ Taken from apache commons ------------------------------//
-
-	/**
-	 * Enum containing reply codes for join request events.
-	 *
-	 * @see net.arikia.dev.drpc.callbacks.JoinRequestCallback
-	 */
 	public enum DiscordReply {
-		/**
-		 * Denies the join request immediately.
-		 * Currently behaving the same way like DiscordReply.IGNORE.
-		 */
-		NO(0),
-		/**
-		 * Accepts the join request, requesting player received a JoinGameCallback.
-		 *
-		 * @see net.arikia.dev.drpc.callbacks.JoinGameCallback
-		 */
-		YES(1),
-		/**
-		 * Denies the join request by letting it time out(10s).
-		 */
-		IGNORE(2);
+		NO(0), YES(1), IGNORE(2);
 
-		/**
-		 * Integer reply code send to Discord.
-		 */
 		public final int reply;
 
 		DiscordReply(int reply) {
@@ -243,9 +153,7 @@ public final class DiscordRPC {
 		}
 	}
 
-	//JNA Interface
 	private interface DLL extends Library {
-		//DLL INSTANCE = Native.load("discord-rpc", DLL.class);
 		DLL INSTANCE = Native.loadLibrary("discord-rpc", DLL.class);
 
 		void Discord_Initialize(String applicationId, DiscordEventHandlers handlers, int autoRegister, String optionalSteamId);
